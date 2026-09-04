@@ -63,3 +63,6 @@ Thumbs.db
 # M3.10 deploy-suite build outputs (two full app builds + the served root).
 e2e/.pwa/
 dist-release/
+
+# Codewhale agent runtime state (local-only, never committed nor linted).
+.codewhale/
