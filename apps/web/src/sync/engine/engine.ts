@@ -17,6 +17,7 @@
 import {
   type AuthProvider,
   createPushChannel,
+  type EmailComparator,
   type EmailFilter,
   getCoreCapability,
   type Id,
@@ -72,7 +73,7 @@ import {
 } from './backfill'
 import { backoffDelayMs, clampRetryAfter, STUCK_AFTER_ATTEMPTS } from './backoff'
 import { type BroadcastChannelLike, defaultBroadcast, EngineBus } from './bus'
-import { isAuthExpiry } from './conflict'
+import { isAuthExpiry, thrownErrorType } from './conflict'
 import {
   type CalendarQuerySpecInput,
   type ContactQuerySpecInput,
@@ -180,7 +181,7 @@ const LRU_TOUCH_INTERVAL_MS = 60_000
  * A flapping connection fires `online` in bursts; each one used to start a full sync pass. Collapse
  * a burst into ONE pass once the line has settled for this long (M3.3).
  */
-const RECONNECT_DEBOUNCE_MS = 750
+export const RECONNECT_DEBOUNCE_MS = 750
 
 /**
  * How often the periodic cache-maintenance pass may run (M3.4). Decoupled from the 60 s safety sweep:
@@ -245,6 +246,17 @@ export interface SyncEngineDeps {
   readonly isForeground?: () => boolean
   /** How long to wait for another tab to answer the foreground probe; defaults to {@link FOREGROUND_ACK_MS}. */
   readonly foregroundAckMs?: number
+  /**
+   * Does this account serve MAIL (S-4)? Defaults to `true` — every engine before S-4 was a mail
+   * engine, and the primary and each delegated MAIL account still are.
+   *
+   * `false` for a delegated account that shares only its contacts or its calendar. Such an account
+   * answers `Mailbox/get` with `forbidden`, and the mail legs are the FIRST thing
+   * {@link runDeltaBlock} does — so an unguarded pass throws before the contacts leg, every pass,
+   * for ever. That is not a hypothetical: it is why the S-4 rails drew an account section that said
+   * "No address books." while `AddressBook/get` was returning the book to the very same session.
+   */
+  readonly syncMail?: boolean
 }
 
 const DEFAULT_SAFETY_INTERVAL_MS = 60_000
@@ -404,6 +416,11 @@ export class SyncEngine {
    * that fails BEFORE the mail delta — offline, an expired session, a throttled first request —
    * caught up on nothing and leaves the exemption where it found it.
    */
+  /** Does this account serve mail? See {@link SyncEngineDeps.syncMail} — default true. */
+  private get syncsMail(): boolean {
+    return this.deps.syncMail !== false
+  }
+
   private mailDeltaRan = false
   /**
    * Stamped when leadership is acquired; mail not strictly newer than this is never notified.
@@ -554,6 +571,52 @@ export class SyncEngine {
       ...options,
       ifInState,
       now: this.clock.now(),
+    })
+    await this.refreshQueueCounts()
+    this.wakeQueue()
+  }
+
+  /**
+   * The same, for a block of actions that arrive together — one COMMIT, still one outbox row each.
+   *
+   * {@link dispatch} is one Dexie transaction per action, and every commit re-runs the live queries
+   * over the tables it touched. That is right for a click. It is wrong for the contact importer,
+   * which dispatches one create per card: measured on fake-indexeddb, 500 cards into a book that
+   * already held 500 took **15.4 s** and re-ran the shared whole-table contact-card subscription
+   * (R-21) 500 times; the same 500 in blocks of fifty took **450 ms** and ten reruns (N-04).
+   *
+   * What deliberately does NOT change: each intent keeps its own outbox row, its own `ifInState`
+   * and its own undo, so a card the server refuses dead-letters alone and never drags the other
+   * forty-nine into the dead letter with it. The batching is about the COMMIT, not about the unit
+   * of work.
+   *
+   * What does change: the block is atomic in the replica. A Dexie failure part-way rolls the whole
+   * block back rather than leaving some of it applied — which is the honest outcome for a caller
+   * that reports progress in blocks.
+   *
+   * The guards are read BEFORE the transaction opens, exactly as {@link dispatch} reads its one.
+   */
+  async dispatchBatch(
+    entries: readonly { intent: OutboxIntent; options: Omit<EnqueueOptions, 'now'> }[],
+  ): Promise<void> {
+    if (entries.length === 0) return
+    const guards = await Promise.all(
+      entries.map(async (entry) =>
+        entry.options.ifInState !== undefined
+          ? entry.options.ifInState
+          : await this.stateGuard(entry.intent),
+      ),
+    )
+    // A nested `db.transaction` of the same scope and mode JOINS this one in Dexie, so the
+    // `enqueueAction` calls below stay exactly as they are and the block commits once.
+    await this.db.transaction('rw', optimisticTables(this.db), async () => {
+      for (const [index, entry] of entries.entries()) {
+        await enqueueAction(this.db, this.accountId, entry.intent, {
+          ...entry.options,
+          ifInState: guards[index] ?? null,
+          now: this.clock.now(),
+        })
+      }
     })
     await this.refreshQueueCounts()
     this.wakeQueue()
@@ -1300,23 +1363,91 @@ export class SyncEngine {
    * not assumed to be the last), else on the first short/empty page.
    */
   private async collectMatchingIds(filter: EmailFilter): Promise<Id[]> {
+    const { ids } = await this.pageQueryIds({
+      filter,
+      sort: [{ property: 'receivedAt', isAscending: true }],
+    })
+    return ids
+  }
+
+  /**
+   * Every id a WATCHED WINDOW matches, paged out of `Email/query` — the ids-only half of what the
+   * window would hold if it were fully loaded. This is "select all in folder" (FR-LST-04, R-08
+   * stage 2): the list offers it after a select-all over an incomplete window, and hands the result
+   * straight into the selection.
+   *
+   * The spec comes from the CACHED WINDOW ROW, not from the caller: `filter`, `sort` and
+   * `collapseThreads` together are what make an id-set, and re-deriving any of them at this seam is
+   * how a "select all" ends up selecting a different set from the one on screen. `collapseThreads`
+   * is the sharp one — a collapsed query answers with ONE id per thread, and which one depends on
+   * the sort — so the window's own sort is used even though {@link collectMatchingIds} has a good
+   * reason to prefer oldest-first (see below). No `Email/get`: 300 ids is a selection, 300 envelopes
+   * is a download nobody asked for, and the rows arrive as they always did, when `loadMore` pages
+   * them in or a bulk action needs them.
+   *
+   * `complete: false` means the query has more ids than `max` and the caller must NOT apply what it
+   * got: a partial set presented as "all of them" is precisely the false promise this feature exists
+   * to remove. The cap is the caller's — see `use-select-all-in-query.ts` for what bounds it.
+   *
+   * THE RACE, stated rather than hidden. Paging by `position` while another client edits the folder
+   * can duplicate an id (an arrival shifts the tail right — harmless, the ids are de-duplicated) or
+   * MISS one (a removal shifts the tail left across a page boundary). `collectMatchingIds` dodges
+   * the first half by sorting oldest-first, where arrivals append instead of shifting; this one
+   * cannot, because it must reproduce the window's own id-set. What that costs is bounded and
+   * honest: the selection ends up holding a few ids fewer than `total`, and the bar states the size
+   * it actually holds. It never holds an id the query did not answer with.
+   */
+  async collectQueryIds(
+    key: string,
+    options: { max: number },
+  ): Promise<{
+    ids: Id[]
+    complete: boolean
+  }> {
+    const row = await getQueryCache(this.db, this.accountId, key)
+    if (!row) throw new Error(`collectQueryIds: no query cache for key ${key}`)
+    return this.pageQueryIds(
+      { filter: row.filter, sort: row.sort, collapseThreads: row.collapseThreads },
+      options.max,
+    )
+  }
+
+  /**
+   * The shared `Email/query` paginator: pages `spec` in fixed chunks until the server's `total` is
+   * reached (a short page is NOT assumed to be the last), until a page comes back short with no
+   * `total` to go on, or until `max` ids have been collected — which is the only way `complete` is
+   * `false`. Ids are de-duplicated, because a concurrent arrival can hand the same id back twice.
+   */
+  private async pageQueryIds(
+    spec: {
+      filter?: EmailFilter | null
+      sort?: EmailComparator[] | null
+      collapseThreads?: boolean
+    },
+    max = Number.POSITIVE_INFINITY,
+  ): Promise<{ ids: Id[]; complete: boolean }> {
     const PAGE = 500
+    const seen = new Set<Id>()
     const ids: Id[] = []
     let position = 0
     for (;;) {
       const result = await this.port.queryEmails({
-        filter,
-        sort: [{ property: 'receivedAt', isAscending: true }],
+        ...spec,
         limit: PAGE,
         position,
         calculateTotal: true,
       })
       if (result.ids.length === 0) break
-      ids.push(...result.ids)
+      for (const id of result.ids) {
+        if (seen.has(id)) continue
+        seen.add(id)
+        ids.push(id)
+      }
       position += result.ids.length
-      if (result.total !== undefined ? ids.length >= result.total : result.ids.length < PAGE) break
+      if (ids.length > max) return { ids: ids.slice(0, max), complete: false }
+      if (result.total !== undefined ? position >= result.total : result.ids.length < PAGE) break
     }
-    return ids
+    return { ids, complete: true }
   }
 
   /**
@@ -1748,38 +1879,78 @@ export class SyncEngine {
      * So the concurrency is not wrong, it is blocked: it needs that gap closed first. Restoring it
      * before then trades a real correctness race for ~150 ms, which is a bad trade in a mail client.
      */
-    const mailboxWrites = await syncMailboxes(this.port, this.db, this.accountId, this.clock)
-    // The folder badges an unsent intent has already moved (M3.10, gap B7). `syncMailboxes`
-    // writes the server's ABSOLUTE count, and it runs BEFORE the replay in `runSyncPass` — so a
-    // mailbox the server reports as changed for an UNRELATED reason (new mail in the Inbox, another
-    // client) silently reverts the optimistic badge to the pre-mutation number, and it stays
-    // reverted until the intent lands. Re-applying is scoped to the count fields this pass actually
-    // wrote and to intents that have provably NEVER BEEN DISPATCHED — which is NOT the same as
-    // `status === 'pending'`, since several paths return an already-dispatched row to `pending`.
-    // See {@link reapplyPendingCounts} and `unsentOutbox`.
-    await reapplyPendingCounts(this.db, this.accountId, mailboxWrites)
     /*
-     * And the folder ROWS (B55). The counts were only half of it: `syncMailboxes` writes the
-     * server's ABSOLUTE list, so a folder created or deleted optimistically while its intent waits
-     * in the outbox is reverted by any pass that reports the mailbox list — the created one
-     * vanishes, the deleted one comes back and STAYS, because the replay that would make the server
-     * agree runs after this block and nothing re-reports the mailbox afterwards.
+     * MAIL — skipped entirely for a contacts/calendar-only delegated account (S-4).
      *
-     * This is the gap the reverted concurrency experiment ran into (see the block above), and
-     * closing it is what that experiment was blocked on.
+     * The guard is here rather than around each call because the whole block is mail: `Mailbox/get`
+     * on such an account answers `forbidden`, and everything below it depends on the mailbox rows
+     * that call writes. Before the guard existed the throw propagated out of the delta block, was
+     * caught in `runSyncPass` as an ordinary `deltaError`, and scheduled a retry that failed the
+     * same way — so the contacts and calendar legs at the bottom of this method were unreachable on
+     * exactly the accounts S-4 added rails for.
+     *
+     * Nothing changes for a mail account: `syncMail` defaults to true.
      */
-    await reapplyPendingMailboxes(this.db, this.accountId)
-    if (!this.identitiesSynced) {
-      await syncIdentities(this.port, this.db, this.accountId, this.clock)
-      this.identitiesSynced = true // only after success, so an offline first pass retries
+    if (this.syncsMail) {
+      const mailboxWrites = await syncMailboxes(this.port, this.db, this.accountId, this.clock)
+      // The folder badges an unsent intent has already moved (M3.10, gap B7). `syncMailboxes`
+      // writes the server's ABSOLUTE count, and it runs BEFORE the replay in `runSyncPass` — so a
+      // mailbox the server reports as changed for an UNRELATED reason (new mail in the Inbox, another
+      // client) silently reverts the optimistic badge to the pre-mutation number, and it stays
+      // reverted until the intent lands. Re-applying is scoped to the count fields this pass actually
+      // wrote and to intents that have provably NEVER BEEN DISPATCHED — which is NOT the same as
+      // `status === 'pending'`, since several paths return an already-dispatched row to `pending`.
+      // See {@link reapplyPendingCounts} and `unsentOutbox`.
+      await reapplyPendingCounts(this.db, this.accountId, mailboxWrites)
+      /*
+       * And the folder ROWS (B55). The counts were only half of it: `syncMailboxes` writes the
+       * server's ABSOLUTE list, so a folder created or deleted optimistically while its intent waits
+       * in the outbox is reverted by any pass that reports the mailbox list — the created one
+       * vanishes, the deleted one comes back and STAYS, because the replay that would make the server
+       * agree runs after this block and nothing re-reports the mailbox afterwards.
+       *
+       * This is the gap the reverted concurrency experiment ran into (see the block above), and
+       * closing it is what that experiment was blocked on.
+       */
+      await reapplyPendingMailboxes(this.db, this.accountId)
+      if (!this.identitiesSynced) {
+        /*
+         * ISOLATED, for the same class of reason as the calendar leg below — and this one was
+         * measured, not anticipated.
+         *
+         * A DELEGATED mailbox has no identities the reader may send from: Stalwart answers
+         * `Identity/get` on a shared account with `forbidden` (measured 2026-09-05 against the
+         * fixture, with carol's inbox shared to alice read-only), which is consistent with ADR-020
+         * — send-as from a delegated account is not offered because the server refuses it.
+         *
+         * Unguarded, that refusal threw out of the delta block from INSIDE the mail leg, so every
+         * pass for such an account ended at `phase: 'error'` before reaching the contacts, calendar
+         * and files legs — which is why a shared account's address books never appeared even when
+         * `AddressBook/get` was returning them to the same session, and why the S-4 rails looked
+         * like a UI bug. The account's mail still synced (the legs above this one had already run),
+         * so nothing about the failure pointed here.
+         *
+         * A refusal is permanent, so it counts as done: retrying it every sweep would be one
+         * pointless round-trip per shared account for ever. Any OTHER failure leaves the flag
+         * alone, so an offline or transient first pass still retries.
+         */
+        try {
+          await syncIdentities(this.port, this.db, this.accountId, this.clock)
+          this.identitiesSynced = true // only after success, so an offline first pass retries
+        } catch (error) {
+          if (isAuthExpiry(error)) throw error
+          if (thrownErrorType(error) !== 'forbidden') throw error
+          this.identitiesSynced = true
+        }
+      }
+      await this.ensureInboxWindow()
+      await syncThreads(this.port, this.db, this.accountId, this.clock)
+      created.push(...(await syncEmails(this.port, this.db, this.accountId, this.clock)))
+      // The catch-up has now happened, whatever becomes of the rest of this pass. This is what arms
+      // M3.6's storm guard — not the pass SUCCEEDING, which is a different claim and was the wrong one.
+      this.mailDeltaRan = true
+      await this.reconcileWatched(forceFull)
     }
-    await this.ensureInboxWindow()
-    await syncThreads(this.port, this.db, this.accountId, this.clock)
-    created.push(...(await syncEmails(this.port, this.db, this.accountId, this.clock)))
-    // The catch-up has now happened, whatever becomes of the rest of this pass. This is what arms
-    // M3.6's storm guard — not the pass SUCCEEDING, which is a different claim and was the wrong one.
-    this.mailDeltaRan = true
-    await this.reconcileWatched(forceFull)
     // Contacts (M4.2): the address-book tree (pulled whole) + the ContactCard delta + the watched
     // contact query windows. Independent of mail; the same `forceFull` SP.4 re-probe applies.
     await syncAddressBooks(this.port, this.db, this.accountId, this.clock)
@@ -2225,6 +2396,8 @@ export function createSyncEngine(deps: {
   createBus?: () => BroadcastChannelLike
   createPush?: SyncEngineDeps['createPush']
   publishStatus?: (status: EngineStatus) => void
+  /** S-4: `false` for a contacts/calendar-only account. See {@link SyncEngineDeps.syncMail}. */
+  syncMail?: boolean
 }): SyncEngine {
   const clock: EngineClock = deps.clock ?? {
     now: () => Date.now(),
@@ -2242,6 +2415,7 @@ export function createSyncEngine(deps: {
     locks: navigator.locks as unknown as LockManagerLike,
     createBus: deps.createBus ?? (() => defaultBroadcast()),
     createPush: deps.createPush ?? ((session, options) => createPushChannel(session, options)),
+    syncMail: deps.syncMail ?? true,
     isOnline: () => navigator.onLine,
     onOnlineChange: (listener) => {
       const on = () => listener(true)

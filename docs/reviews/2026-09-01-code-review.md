@@ -45,17 +45,31 @@ Zwei Kandidaten wurden bereits in der Gegenprüfung verworfen (PIM-22 als Duplik
 unbegründet) und stehen nur im Anhang. Genau eine Regression aus den Fix-Commits ist belegt (R-05, W-18);
 die übrigen W-Bezüge sind unvollständige Fixes oder neue Stellen bekannter Muster.
 
-> **Stand 02.09.2026: 109 der 112 Befunde sind abgearbeitet** — elf Themen-Branches mit je einem
-> Pull Request (#56 bis #66), ein Commit je Befundgruppe, jeder Fix mit Regressionstest und
-> Mutationsprobe (Fix entfernt ⇒ Test rot). Die Testsuite ist dabei von 5304 auf 5702 Tests
-> gewachsen, das Bundle von 288,4 auf 291,7 KB gz (Grenze 300).
+> **Stand 04.09.2026: 110 der 112 Befunde sind abgeschlossen** — 109 behoben, einer (R-27) als
+> Eigentümerentscheidung entschieden. Elf Themen-Branches mit je einem Pull Request (#56 bis #66),
+> ein Commit je Befundgruppe, jeder Fix mit Regressionstest und Mutationsprobe (Fix entfernt ⇒
+> Test rot). Die Testsuite ist dabei von 5304 auf 5836 Tests gewachsen, das Bundle von 288,4 auf
+> 292,36 KB gz (Grenze 300).
 >
-> **Drei Befunde bleiben bewusst offen**, jeder mit Begründung am Eintrag:
-> - **R-27** — JMAP bietet keinen Idempotenzschlüssel für Creates, und der im Bericht
->   vorgeschlagene Ausweg bricht das Offline-Autosave. Nur die falsche Zusage im Modulkopf ist
->   korrigiert; die Entscheidung liegt als [ADR-038](../adr/038-creates-are-not-idempotent-and-jmap-offers-no-key.md) vor.
-> - **R-78** — die Behebung ändert, was über eine Sitzung hinweg persistiert wird. Das ist eine
->   Produktentscheidung; als Backlog-Eintrag im Implementierungsplan aufgenommen.
+> **R-27 ist entschieden, nicht behoben** (04.09.2026): *lieber ein seltenes Duplikat als ein
+> häufiger Falschfehler.* JMAP bietet keinen Idempotenzschlüssel für Creates, und jeder heute
+> verfügbare Ausweg erkauft weniger Duplikate mit mehr Falschfehlern über gelungene Aktionen —
+> der im Bericht vorgeschlagene bricht zusätzlich das Offline-Autosave. Korrigiert ist die falsche
+> Zusage im Modulkopf; das Laufzeitverhalten bleibt und ist ab jetzt das spezifizierte Verhalten
+> dieses Clients. Die Aufzeichnung ist
+> [ADR-038](../adr/038-creates-are-not-idempotent-and-jmap-offers-no-key.md) (`accepted`); die dort
+> ausformulierte Sonde vor dem Wiederholungsversuch ist ein späterer Ausbau, kein offener Punkt.
+>
+> **R-78 ist seit dem 04.09.2026 erledigt.** Die Produktentscheidung, die es aufhielt — was über
+> eine Sitzung hinweg persistiert wird — hat der Eigentümer an diesem Tag getroffen: das
+> JMAP-Sitzungsdokument darf gespeichert werden, ohne Token und ohne Mailinhalt. Umgesetzt ist es
+> anders als der Lösungsansatz es skizzierte (im verschlüsselten Credential-Store statt im Replica,
+> Begründung am Befund und in
+> [ADR-041](../adr/041-the-session-document-lives-with-the-credentials.md)). Der E2E-Tripwire hat
+> dabei genau das getan, wofür er stand: er ist rot geworden und ist jetzt der
+> Offline-Kaltstart-Test.
+>
+> **Ein Befund bleibt offen**, mit Begründung am Eintrag:
 > - **R-104** — der vorgeschlagene Fix macht den Test nicht grün. Gegen die laufende Fixture
 >   gemessen: ein geteiltes Adressbuch landet im Account der Eigentümerin, und die
 >   Kontakte-Oberfläche fragt nur ein Konto ab. Korrigiert ist nur die falsche Skip-Begründung.
@@ -64,10 +78,18 @@ die übrigen W-Bezüge sind unvollständige Fixes oder neue Stellen bekannter Mu
 > Begründung steht jeweils am Befund und im Commit. Am deutlichsten bei **R-37**, wo der
 > vorgeschlagene Weg den Defekt in beiden Browser-Engines verschlimmert hätte, und bei **R-61**,
 > wo die geforderte Messung die Virtualisierung überflüssig machte (920 ms → 0,9 ms allein durch
-> den Render-Fix).
+> den Render-Fix). Bei **N-04** hat dieselbe Regel umgekehrt entschieden: dort trug die Messung
+> den geforderten Fix (15,4 s → 450 ms für 500 Karten).
 >
-> Was bei der Abarbeitung neu aufgefallen ist, steht unten als **N-01 bis N-10**; acht weitere
-> Nebenbefunde sind im selben Durchgang behoben worden.
+> Was bei der Abarbeitung neu aufgefallen war, steht unten als **N-01 bis N-10** — **inzwischen
+> alle zehn erledigt**, in zwei aufeinander gestapelten Branches (Compose: N-01 bis N-03, PR #69;
+> PIM/UI: N-04 bis N-08 und N-10). N-09 war schon nebenbei behoben, acht weitere Nebenbefunde
+> bereits im ersten Durchgang. Beim Abarbeiten der Nebenbefunde sind sechs weitere aufgefallen und
+> mitbehoben worden (eine stehen gebliebene Outbox-Zeile nach bestätigtem Send, der
+> Klartext-Editor, der einer externen Body-Änderung nicht folgte, ein nicht erschöpfender
+> `DraftSyncStatus`-Guard, eine fünfte `__proto__`-Stelle im Kalender, ein Kontaktimport, der
+> mittendrin abbrach ohne es zu sagen, und die Liste geplanter Sendungen, die nach einer
+> Wiederverbindung auf ihrer Fehlermeldung sitzen blieb).
 
 ## Zusammenfassung
 
@@ -472,7 +494,35 @@ Papierkorb kein „Delete“. Gegenprüfung: bestätigt.
 
 ### R-08 — [MEDIUM] „Alle auswählen“ wählt nur das geladene 50er-Fenster, zeigt die Kopf-Checkbox aber als vollständig gesetzt — Bulk-Aktionen erfassen den Rest des Ordners nicht
 
-**Status:** [x] erledigt — Stufe 1
+**Status:** [x] erledigt — beide Stufen
+Stufe 2 am 2026-09-04 vom Eigentümer freigegeben und umgesetzt (ADR-042, ADR-043): nach einem
+Select-all über ein unvollständiges Fenster bietet die Bulk-Bar „Alle {{total}} auswählen“, holt die
+Ids der ganzen Query seitenweise per `Email/query` (`Engine.collectQueryIds`, 500er-Chunks, ohne
+`Email/get`) und legt sie in die Selektion. Der im Lösungsansatz genannte Paginierer wurde ERWEITERT
+statt kopiert: `collectMatchingIds` und `collectQueryIds` sind ein `pageQueryIds`. Die Account-Floor-
+Klausel in `rights.ts` hat genau das getan, wofür sie aufgehoben wurde — bei 250 von 300 nicht
+hydrierten Zeilen fällt das Urteil auf sie zurück, was auf dem eigenen Konto wahr ist und den
+Einkonten-Pfad unverändert lässt.
+**Die Entscheidung, die der Lösungsansatz nicht enthielt, ist die Bedeutung von „alle 300“ zwischen
+Klick und Aktion (ADR-042): die Ids sind eine MOMENTAUFNAHME, kein Abonnement.** Jeder Schreibvorgang
+hier ist ein Outbox-Intent über ein explizites `emailIds`-Array — das macht ihn dauerhaft, offline
+wiederholbar und rückgängig-fähig —, ein erst beim Absenden aufgelöster Umfang bräuchte also eine
+Netzrunde in einem Pfad, der dem Nutzer die Aktion bereits bestätigt hat, und offline ginge er gar
+nicht. Deshalb nennt die Leiste eine ZAHL und nie „alle“: eine später eintreffende Nachricht ist
+nicht in der Menge, der Zähler bleibt stehen, und die Kopf-Checkbox wird wieder `indeterminate`.
+Drei Folgen, alle beim Bauen gefunden: (1) `pruneSelection` hätte 250 der 300 bei der nächsten
+Fensterveröffentlichung wieder entfernt — unter `beyondWindow` entfernt es nur Ids, die IM Fenster
+waren und es verlassen haben; (2) die Paginierung muss `filter`/`sort`/`collapseThreads` des Fensters
+verwenden, weil eine kollabierte Query je Thread eine Id liefert und WELCHE von der Sortierung
+abhängt; (3) eine Momentaufnahme braucht eine Obergrenze — zwei Live-`useEmailWindow`-Abos lesen die
+ganze Id-Menge bei jedem `emails`-Schreibvorgang (gemessen: 588 ms je Durchgang bei 10 000 Ids,
+4 s bei 50 000), daher **ADR-043**: Deckel bei 10 000, und der Knopf sagt es. Offline, „zu viele“ und
+„der Ordner ist unter dem Klick über den Deckel gewachsen“ stehen als `unavailableReason` auf dem
+Knopf (fokussierbar, nicht `disabled`); ein Request ohne Antwort nicht, weil der Knopf für den
+Wiederholversuch drückbar bleiben muss. Das Undo trägt die volle Menge (ein inverser `move`,
+auto-gechunkt). Gemessen auf Telefon (390 × 844) und Tablet (834 × 1112) mit `noOverflow` plus
+Zeilenzählung — das ist der Grund, warum der zweite Schritt eine eigene Zeile bekommen hat.
+
 Stufe 1 (ehrliche Oberfläche) ist umgesetzt: `allSelected` verlangt zusätzlich, dass das Fenster die
 ganze Trefferliste ist, sonst zeigt die Kopf-Checkbox `indeterminate` und der Zähler den neuen Key
 `list.selectedOfTotal` („20 von 300 ausgewählt", 14 Bundles). Kommentar in `message-selection.ts`,
@@ -483,9 +533,10 @@ beim Klick `checked: true` und hätte nur erneut alles ausgewählt, statt zu lee
 spiegelt `indeterminate` jetzt nach jedem Commit statt nur bei Änderung des Props — ein nativer Klick
 löscht die Eigenschaft, und bis hierher blieb kein Aufrufer über einen Klick hinweg gemischt.
 
-**Stufe 2 bleibt offen:** „Alle {{total}} auswählen" über alle Treffer (FR-LST-04 Must). Als
+~~**Stufe 2 bleibt offen:** „Alle {{total}} auswählen" über alle Treffer (FR-LST-04 Must). Als
 Backlog-Eintrag in `docs/implementation-plan.md` §11 aufgenommen, mit dem Paginierer
-(`collectMatchingIds`) und der Account-Floor-Klausel als benanntem Ausgangspunkt.
+(`collectMatchingIds`) und der Account-Floor-Klausel als benanntem Ausgangspunkt.~~ — am 2026-09-04
+erledigt, siehe Status oben. FR-LST-04 ist damit vollständig erfüllt.
 
 **Kategorie / Bereich:** correctness / Mail
 
@@ -1267,15 +1318,23 @@ the requested database object could not be found…`. Gegenprüfung: bestätigt.
 
 ### R-27 — [MEDIUM] Nicht-idempotente Creates werden nach verlorener Antwort oder Absturz erneut gesendet — Duplikate bei Drafts und Adressbüchern, falsche Fehlermeldungen bei Kontakten und Ordnern
 
-**Status:** [ ] offen
-NICHT behoben, bewusst. Umgesetzt ist nur die Sofortmaßnahme (S) aus dem Lösungsansatz: Modulkopf,
+**Status:** [x] entschieden (04.09.2026) — das Verhalten bleibt, bewusst
+**Eigentümerentscheidung: lieber ein seltenes Duplikat als ein häufiger Falschfehler.** Damit ist
+Punkt 3 der Entscheidung in [ADR-038](../adr/038-creates-are-not-idempotent-and-jmap-offers-no-key.md)
+gewählt; das ADR steht auf `accepted`. Das ist keine Wahl zwischen einem Fehler und einer Behebung,
+sondern zwischen zwei Fehlern: jedes heute verfügbare Mittel erkauft weniger Duplikate mit mehr
+Falschfehlern, und ein Falschfehler trifft laut, oft und ausgerechnet jemanden, dessen Aktion
+GELUNGEN ist. Ein Duplikat ist dagegen sichtbar und löschbar.
+Umgesetzt (01.09.2026) ist die Sofortmaßnahme (S) aus dem Lösungsansatz: Modulkopf,
 `recoverStranded` und der transiente Retry-Zweig sagen jetzt, dass die Create-Familie NICHT idempotent
-ist, statt das Gegenteil zu behaupten. Das Laufzeitverhalten ist unverändert. Der eigentliche Fix — vor
-dem ERNEUTEN Versand serverseitig prüfen, ob das Objekt schon existiert — ist eine
-Architekturentscheidung (welche Sonden die Outbox stellen darf, `messageId` in `toEmailCreate`) und
-steht mit allen Optionen und Kosten in `docs/adr/038-creates-are-not-idempotent-and-jmap-offers-no-key.md`.
-Ein Teil-Fix, der Duplikate nur seltener macht (etwa Dead-Letter nach geworfenem Fehler), wäre ein
-Rückschritt: er bricht das Offline-Autosave, wie die Gegenprüfung festgestellt hat.
+ist, statt das Gegenteil zu behaupten. Das Laufzeitverhalten ist unverändert und ist ab jetzt das
+SPEZIFIZIERTE Verhalten dieses Clients, nicht eine Lücke.
+Die im ADR ausformulierte Sonde vor dem WIEDERHOLTEN Versand (`messageId` in `toEmailCreate`,
+`ContactCard/query {uid}`, `AddressBook/get`, `Mailbox/get`) wird vorerst NICHT gebaut. Sie steht
+dort als späterer Ausbau mit allen Kosten — Kandidat für ein künftiges Arbeitspaket, kein offener
+Punkt dieses Reviews. Ein Teil-Fix, der Duplikate nur seltener macht (etwa Dead-Letter nach
+geworfenem Fehler), bleibt ausgeschlossen: er bricht das Offline-Autosave, wie die Gegenprüfung
+festgestellt hat.
 
 **Kategorie / Bereich:** correctness / Sync
 
@@ -3168,13 +3227,25 @@ ist `localStorage.getItem('waxwing.connect.target')` null.
 
 ### R-78 — [LOW] Offline-Kaltstart landet auf dem Login-Formular — bekannter, per E2E-Tripwire gepinnter Produktdefekt ohne Tracking-Eintrag
 
-**Status:** [ ] offen
-Bewusst NICHT umgesetzt: bekannter Produktdefekt, per E2E-Tripwire gepinnt
-(`e2e/tests/pwa.spec.ts`), dessen Behebung eine Produktentscheidung mittleren Umfangs ist —
-sie aendert, was ueber eine Sitzung persistiert wird. Als Backlog-Eintrag in
-`docs/implementation-plan.md` §11 aufgenommen (2026-09-02), damit das Must FR-OFF-01 nicht nur
-in einem Testkommentar lebt. Der Tripwire bleibt rot-schlagend, wenn jemand die Luecke
-schliesst.
+**Status:** [x] erledigt
+Am 2026-09-04 vom Eigentümer freigegeben und umgesetzt (ADR-041). Der Tripwire hat getan, wozu er
+da war: die Behebung hat ihn rot gemacht, und er ist jetzt der Offline-Kaltstart-Test, den M3.5
+ursprünglich verlangt hat.
+Abweichung vom Lösungsansatz unten, begründet in ADR-041: das Sitzungsdokument liegt NICHT im
+Replica, sondern im verschlüsselten Credential-Store neben dem `AuthRecord`. Das Replica ist nicht
+verschlüsselt (nur der Auth-Store ist es — der gewählte Ort ist also der, den der Plan-Text
+beschrieb), es überlebt ein einfaches Abmelden, und es ist per ADR-008 kontenübergreifend, während
+das Dokument die accountId erst bestimmt. Im Credential-Store ist die Invariante „das gespeicherte
+Dokument gehört zu den gespeicherten Zugangsdaten" strukturell: geschrieben nur, wenn ein
+`AuthRecord` existiert (Basic ohne „angemeldet bleiben" und der Public-Computer-Modus speichern
+weiterhin nichts), gelöscht in denselben Zeilen, die einen neuen `AuthRecord` schreiben, und mit
+`logout()` samt Datenbank weg.
+Zwei weitere bewusste Verengungen: der Offline-Pfad greift nur bei `TypeError` UND
+`navigator.onLine === false` (bei behaupteter Verbindung ist „Server nicht erreichbar" die
+handlungsfähige Antwort, und es käme nie ein `online`-Event, das den Zustand beendet), und der
+Reconnect läuft als voller Connect statt `refreshSession()` — letzteres ließe `accounts`/`delegated`
+so veraltet, wie sie waren. Beim Zurücklesen wird das Dokument über `sessionFromStore` erneut wie
+eine frische Antwort geprüft (Form UND Origin der vier URLs).
 
 **Kategorie / Bereich:** robustness / App (Session)
 
@@ -4457,7 +4528,7 @@ engine …`, exit 0; `engineStrict: true` in `pnpm-workspace.yaml` → `ERR_PNPM
 41. **R-107** und **R-112** — `engines`-Range und `engineStrict` gehören zusammen, sonst bleibt es bei der Warnzeile.
 42. **R-103**, **R-105**, **R-106**, **R-108**, **R-109**, **R-111** — Release- und CI-Hygiene: Versionswächter, `unzip`/mtime, doppeltes DOMPurify, `concurrency`, Fake-Timer-Cleanup, Cache-Header für Theme und Branding.
 43. **R-68**, **R-97**, **R-101**, **R-110**, **R-102** — Kommentare und Doku, die auf falsche Fährten führen; R-102 zuerst, weil `SECURITY.md` eine falsche Zusage enthält.
-44. **R-08** (Stufe 2) — FR-LST-04 tatsächlich erfüllen („Alle {{total}} auswählen“); M, braucht `collectMatchingIds`.
+44. ~~**R-08** (Stufe 2) — FR-LST-04 tatsächlich erfüllen („Alle {{total}} auswählen“); M, braucht `collectMatchingIds`.~~ — erledigt 2026-09-04 (ADR-042, ADR-043).
 
 ## Nicht bestätigt
 
@@ -4595,9 +4666,21 @@ sind. Nummerierung `N-…`, damit sie mit den `R-…` aus diesem Review nicht ko
 
 Die Fundstellen sind gegen den Stand nach allen zehn Blöcken (`802e092`) geprüft.
 
+**Stand 04.09.2026: alle zehn sind erledigt**, in zwei aufeinander gestapelten Branches — N-01 bis
+N-03 im Compose-Block (PR #69), N-04 bis N-08 und N-10 im PIM/UI-Block; N-09 war schon nebenbei
+behoben. Jeder Eintrag sagt unter seinem Status, was tatsächlich gemacht wurde und wo davon
+abgewichen wurde: N-03, N-07 und N-10(a) sind bewusst anders gelöst als vorgeschlagen, N-06 in der
+kleinen Variante (R-104 bleibt offen), und bei N-04 und N-10(a) stand eine Messung vor der
+Entscheidung — bei N-04 trug sie den Fix, bei N-10(a) nicht.
+
 ### N-01 — [MEDIUM] Ein abgelehntes Löschen des Vorgänger-Entwurfs beim Senden ist unsichtbar
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+`PortSetResult` trägt jetzt `emailNotDestroyed` UND `emailNotUpdated` aus dem Geschwister-`Email/set`;
+`reconcileSendRemainder` arbeitet sie auf dem ERFOLGS-Pfad ab: der stehen gebliebene Server-Entwurf
+wird als gewöhnlicher `discardDraft` unter der Id der fertigen Zeile nachgereiht (`notFound` ist kein
+Rest), das abgelehnte Quell-Flag wird aus dem persistierten Undo zurückgenommen. Kein Dead Letter —
+die Submission ist nicht idempotent. Begründung als [ADR-039](../adr/039-a-send-finishes-its-leftovers-it-never-fails-for-them.md).
 
 **Kategorie / Bereich:** correctness (stiller Datenverlust) / Compose
 
@@ -4615,8 +4698,9 @@ eine Methode weiter.
 **Auswirkung:** Der Brief geht raus, der alte Entwurf bleibt im Entwürfe-Ordner stehen, und niemand
 erfährt davon. Auf einem Server, der den `destroy` regelmäßig ablehnt (fehlende Rechte auf einem
 delegierten Konto, ein Entwurf, den ein anderer Client inzwischen verschoben hat), sammelt sich pro
-gesendeter Mail eine Leiche an. Zusammen mit R-27 (offen) ist das der zweite Weg, auf dem der
-Entwürfe-Ordner voll bleibt.
+gesendeter Mail eine Leiche an. Zusammen mit R-27 (entschieden: Duplikate durch
+Re-Send bleiben, [ADR-038](../adr/038-creates-are-not-idempotent-and-jmap-offers-no-key.md)) ist
+das der zweite Weg, auf dem der Entwürfe-Ordner voll bleibt.
 
 **Lösungsansatz:** `PortSetResult` um ein `emailNotDestroyed` neben `emailCreated` erweitern und im
 Outbox-Pfad eigens behandeln — und zwar NICHT als Rejection: der Brief ist raus, ein Dead Letter
@@ -4632,7 +4716,14 @@ Fundstelle im aktuellen Stand nachgeprüft: `port.ts:388-389` gibt weiterhin nur
 
 ### N-02 — [LOW] Ein gerade geöffneter Server-Entwurf bekommt den Status `pending`, wodurch der R-12-Schutz beim ersten Schließen nicht greift
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+`adoptServerDraft` schreibt `status: 'synced'`. Die Semantik von `DraftSyncStatus` steht jetzt als
+Kommentar an der Typdefinition (`sync/db.ts`): der Wert ist eine Aussage über den INHALT dieser Zeile
+gegenüber der Server-Kopie, nie darüber, wie die Zeile entstanden ist — `synced` heißt „nichts
+offen“ und setzt eine `serverEmailId` voraus. Alle Leser geprüft: Crash-Restore überspringt die Zeile
+(der Text liegt im Entwürfe-Ordner), `flushDraft` spart den Roundtrip, `stampDraftError`/`retryFailed`
+setzen weiterhin `pending`/`error` und bleiben unberührt. Nebeneffekt: ein Server-Entwurf mit `bcc`
+verliert es beim reinen Öffnen und Schließen nicht mehr, weil gar nicht mehr geschrieben wird.
 
 **Kategorie / Bereich:** correctness / Compose
 
@@ -4662,7 +4753,19 @@ Stand nachgeprüft.
 
 ### N-03 — [LOW] Die Umwandlung nach Klartext normalisiert Leerraum und verliert im Klartextmodus Einrückungen
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+Bewusst ANDERS gelöst als vorgeschlagen: ein globales `preserve: true` (also `preformatted` an der
+Wurzel) hätte auch den Leerraum FREMDER HTML-Mails erhalten — ein zitierter Reply im Klartextmodus
+hätte die Zeilenumbrüche und Einrückungen des Absender-Markups bekommen. Stattdessen markiert
+`plainTextToHtml` den Leerraum, den der Schreiber getippt hat (Einrückung und Läufe ab zwei Zeichen
+als `&nbsp;`, wie es jeder contenteditable-Editor tut), und `htmlToPlainText(html, {
+keepTypedWhitespace: true })` bringt genau den zurück; gewöhnlicher Leerraum wird weiterhin normalisiert.
+Zusätzlich war ein `<div><br></div>` — die Schreibweise für eine LEERZEILE — bisher komplett verschluckt:
+das ist jetzt in BEIDEN Modi eine Leerzeile. Aufrufer: Editor-Seed (2×) und, abweichend vom
+Lösungsansatz, der Sendepfad bei `plainText`-Entwürfen — dort ist der `text/plain`-Teil keine
+abgeleitete Alternative, sondern der Text selbst; alle übrigen Aufrufer (Mail-Alternative,
+Leer-Prüfung, Signatur, Abwesenheitsnotiz) normalisieren unverändert. Bekannte Grenze: ein TAB gilt
+weiter als Layout (dokumentiert an `ConvertOptions`).
 
 **Kategorie / Bereich:** correctness (Datenverlust beim Wechsel) / Compose
 
@@ -4694,7 +4797,24 @@ Meldung (`normalize` kennt `<pre>` nicht, gemeldet aus „compose-restliche") is
 
 ### N-04 — [LOW] Der Kontaktimport reiht je Karte eine eigene Transaktion ein
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+**Zuerst gemessen** (fake-indexeddb, Node 24, 500 importierte Karten, ein Lauf je Zeile;
+Emissionen = Reruns der EINEN geteilten `contactCards`-Subscription aus R-21):
+
+| Ausgangsbestand | je Karte eine Transaktion | Blöcke à 50 | ein Block à 500 |
+| --- | --- | --- | --- |
+| leeres Buch | 4 645 ms / 500 | 283 ms / 10 | 181 ms / 1 |
+| 500 Karten | 15 394 ms / 500 | 450 ms / 10 | 180 ms / 1 |
+| 500 Karten, 50 mit Foto | 16 857 ms / 500 | 494 ms / 10 | 187 ms / 1 |
+
+Die Messung trägt den Fix deutlich: bei `MAX_IMPORT_CARDS = 1000` sind das gut 30 s blockierter
+Hauptthread. Umgesetzt ist die sichere Variante — `SyncEngine.dispatchBatch` legt einen Block in
+EINE `db.transaction`, jede Karte behält aber ihre eigene Outbox-Zeile, ihr eigenes Undo und
+ihren eigenen `ContactCard/set`-Create; eine abgelehnte Karte zieht die anderen 49 nicht mit ins
+Dead Letter. Kein Batch-Intent. Blockgröße 50 und nicht „alles auf einmal": ein Block ist der
+feinste Punkt, an dem die Abbruchprüfung noch VOR dem Schreiben sitzt, und 20 Blöcke sind 20
+Fortschrittsschritte statt eines Sprungs von 0 auf 1000. Zwischen den Blöcken gibt der Import den
+Event-Loop frei, sonst bewegt sich der Balken trotzdem nicht.
 
 **Kategorie / Bereich:** performance / PIM (Kontakte)
 
@@ -4722,7 +4842,14 @@ Stand nachgeprüft.
 
 ### N-05 — [LOW] Das Laden der Kalenderliste hängt nicht am Online-Zustand
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+Ein zweiter Effekt lädt die Liste bei der WIEDERVERBINDUNG nach — auf die Flanke (`online` war
+`false`), nicht auf `online === true`, damit ein normal verbundener Start keine zweite Anfrage
+kostet. Die Entprellung ist nicht nachgebaut, sondern DIESELBE: `RECONNECT_DEBOUNCE_MS` (750 ms)
+ist jetzt aus `sync/engine` exportiert und wird hier importiert, denn die Leiste ist die Legende
+zu dem Monat, den die Engine mit genau dieser Verzögerung nachholt — zwei getrennte Zahlen wären
+zwei Zahlen, die auseinanderlaufen. Der „Erneut versuchen"-Balken bleibt für den Fehler, der keine
+Verbindungsfrage ist.
 
 **Kategorie / Bereich:** correctness (Offline-Verhalten) / PIM (Kalender)
 
@@ -4748,7 +4875,14 @@ Stand nachgeprüft.
 
 ### N-06 — [LOW] Die Kennzeichnung schreibgeschützter Adressbücher ist im Browser nicht auslösbar
 
-**Status:** [ ] offen
+**Status:** [x] erledigt (kleine Variante — R-104 bleibt offen)
+Die Anzeige ist als **Vorleistung** dokumentiert, an beiden Stellen mit Verweis auf R-104:
+Modulkopf von `AddressBookList.tsx` (warum heute kein Buch `mayWrite: false` tragen KANN und
+warum der Code trotzdem bleibt) und an `ContactFormProps.canWrite`. Festgenagelt ist sie mit
+Tests gegen ein synthetisch schreibgeschütztes Buch. Die Anzeige des Markers und die gesperrten
+Formulare waren schon getestet; nicht getestet war die unterdrückte Umbenennung — das ging
+bisher nur an einem Buch OHNE jedes Recht durch, an dem gar kein Menü erscheint. Dafür jetzt ein
+Buch `mayWrite: false` + `mayDelete: true`: „Löschen" ja, „Umbenennen" nein.
 
 **Kategorie / Bereich:** correctness (Feature ohne erreichbaren Zustand) / PIM (Kontakte)
 
@@ -4778,7 +4912,17 @@ nachgeprüft.
 
 ### N-07 — [LOW] Die IME-Regel steht an zwei Orten
 
-**Status:** [ ] offen
+**Status:** [x] erledigt (es waren DREI)
+Beim Zusammenlegen kam eine dritte Fassung dazu: der globale Keydown-Listener
+(`ShortcutProvider.tsx:81`) buchstabierte die Regel ebenfalls aus. Die Prämisse des Befunds hält
+außerdem nicht — `shortcuts` importiert heute schon an sechs Stellen aus `../ui`, darunter
+`isComposingKey` selbst in `CommandPalette.tsx`, und `ui/` ist das EINZIGE Verzeichnis in
+`apps/web/src`, das aus keinem anderen Bereich importiert. Also keine dritte Datei und kein neues
+`lib/`: die Regel bleibt in `ui/`, steht seit R-40 ohnehin im Barrel, und die beiden Kopien rufen
+sie jetzt auf ([ADR-040](../adr/040-the-ime-rule-lives-in-ui.md)). Festgehalten mit einem
+QUELLTEXT-Test statt eines Verhaltenstests: drei Verhaltenstests waren gegen drei Kopien grün —
+genau das war der Zustand. `composition.source.test.ts` zählt `keyCode === 229` im ausgelieferten
+Quelltext und verlangt genau eine Datei.
 
 **Kategorie / Bereich:** maintainability / UI
 
@@ -4806,7 +4950,14 @@ vorhanden.
 
 ### N-08 — [LOW] Vier weitere Objektliterale mit fremdbestimmten Schlüsseln im Kalender
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+Alle vier Stellen auf `Object.create(null)`, je eine mit eigenem Regressionstest (`__proto__` als
+Alarm-Schlüssel, als `.ics`-Member, als Override-Member, als Snapshot-Property beim Undo).
+Beim Durchgehen kam eine FÜNFTE, im Befund nicht genannte Stelle derselben Klasse dazu:
+`mergeOverride` (`event-recurrence.ts:235-243`) baut die Override-Map und den gemergten Eintrag
+ebenfalls als Literale — heute nur durch die Herkunft des Schlüssels gerettet, jetzt beide mit
+Nullprototyp. `excludeOverride` braucht nichts: ein BERECHNETER Schlüssel im Objektliteral legt
+immer eine eigene Property an; das steht als Kommentar daneben, damit es niemand „mitrepariert".
 
 **Kategorie / Bereich:** robustness (Security-Härtung) / PIM (Kalender)
 
@@ -4861,7 +5012,18 @@ nachgeprüft und behoben vorgefunden.
 
 ### N-10 — [INFO] Zwei Beobachtungen ohne Fehlverhalten
 
-**Status:** [ ] offen
+**Status:** [x] erledigt
+(a) **Gemessen**: 200 Re-Renders eines offenen Menüs ergeben mit dem Inline-Array 201
+`pointerdown`-Anmeldungen und 200 Abmeldungen, mit stabilem Array 1 und 0 — rund 34 µs je Render
+(die reine DOM-Operation kostet 1,4 µs). Das trägt keinen Performance-Fix, aber die Änderung ist
+eine Zeile und risikolos, deshalb mitgenommen: `extraRefs` wird jetzt über eine Ref gelesen, genau
+wie `onDismiss` seit R-39 — „memoisiere das Array, das du mir gibst" ist die Zusage, die diese
+Datei ihren Aufrufern zwei Absätze weiter oben schon ausdrücklich nicht abverlangt. Behoben in
+`useDismiss` und nicht an der Aufrufstelle, damit es für jede künftige gilt.
+(b) Drei Tests für den Ladepfad von `ScheduledSends`: „wird geladen" (und eben NICHT „nichts
+geplant", solange die Anfrage läuft), leere Liste, und der Fehlschlag als `role="alert"` statt als
+Leerzustand — die beiden sind im Bauteil ein Zeichen auseinander und auf dem Schirm der
+Unterschied zwischen „nichts geplant" und „geht raus, wir konnten nur nicht nachsehen".
 
 **Kategorie / Bereich:** maintainability / UI, Outbox
 

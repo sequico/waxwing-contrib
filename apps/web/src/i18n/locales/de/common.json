@@ -39,6 +39,7 @@
   },
   "onboarding": {
     "welcome": "Willkommen bei {{product}}",
+    "offline": "Sie sind offline. Die Anmeldung braucht eine Verbindung — sobald eine da ist, ist Ihre Mail wieder da.",
     "connect": {
       "title": "Mit Ihrem Postfach verbinden",
       "label": "E-Mail-Adresse oder Server",
@@ -893,6 +894,7 @@
         "skipped_other": "{{count}} Zeilen konnten nicht gelesen werden",
         "imported_one": "{{count}} Kontakt importiert.",
         "imported_other": "{{count}} Kontakte importiert.",
+        "importFailed": "{{done}} von {{total}} Kontakten wurden importiert, dann wurde der Import abgebrochen. Wählen Sie die Datei erneut aus, um den Rest zu wiederholen — bereits vorhandene Kontakte werden als Duplikate übersprungen.",
         "empty": "In der Datei wurden keine Kontakte gefunden.",
         "capped": "Es werden nur die ersten {{max}} Kontakte importiert."
       },
@@ -1040,9 +1042,13 @@
     "answered": "Beantwortet",
     "select": "Nachricht auswählen",
     "selectAll": "Alle auswählen",
-    "selected": "{{count}} ausgewählt",
-    "selectedOfTotal": "{{count}} von {{total}} ausgewählt",
+    "selected": "{{count, number}} ausgewählt",
+    "selectedOfTotal": "{{count, number}} von {{total, number}} ausgewählt",
     "clearSelection": "Auswahl aufheben",
+    "selectAllInQuery": "Alle {{total, number}} auswählen",
+    "selectAllOffline": "Sie sind offline. Der ganze Ordner lässt sich nur mit Verbindung auswählen.",
+    "selectAllTooMany": "Mehr als {{max, number}} Nachrichten — zu viele, um sie in einem Schritt auszuwählen.",
+    "selectAllFailed": "Der Ordner ließ sich gerade nicht lesen — die Auswahl bleibt unverändert.",
     "actions": {
       "archive": "Archivieren",
       "delete": "Löschen",
@@ -1081,7 +1087,7 @@
     },
     "viewOptionsUnavailable": "Sortierung und Konversationsansicht gelten nur für Ordner.",
     "confirmDeleteBody_one": "Diese Nachricht wird endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
-    "confirmDeleteBody_other": "Diese {{count}} Nachrichten werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+    "confirmDeleteBody_other": "Diese {{count, number}} Nachrichten werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
     "loadMore": "Mehr laden",
     "loading": "Nachrichten werden geladen",
     "stale": "Diese Liste ist nicht aktuell und wird bei der nächsten Synchronisation aktualisiert.",
@@ -1448,8 +1454,8 @@
     "findLarge": "Große Nachrichten finden",
     "results": {
       "empty": "Keine Nachrichten entsprechen Ihrer Suche. Versuchen Sie es in allen Ordnern oder mit weniger Wörtern.",
-      "count_one": "{{count}} Treffer",
-      "count_other": "{{count}} Treffer"
+      "count_one": "{{count, number}} Treffer",
+      "count_other": "{{count, number}} Treffer"
     },
     "chipsLabel": "Aktive Filter",
     "chipsCount_one": "{{count}} Filter aktiv",

@@ -39,6 +39,7 @@
   },
   "onboarding": {
     "welcome": "Witamy w {{product}}",
+    "offline": "Jesteś offline. Logowanie wymaga połączenia — gdy tylko się pojawi, poczta znów tu będzie.",
     "connect": {
       "title": "Połącz się ze swoją skrzynką pocztową",
       "label": "Adres e-mail lub serwer",
@@ -921,6 +922,7 @@
         "imported_few": "Zaimportowano {{count}} kontakty.",
         "imported_many": "Zaimportowano {{count}} kontaktów.",
         "imported_other": "Zaimportowano {{count}} kontaktu.",
+        "importFailed": "Zaimportowano {{done}} z {{total}} kontaktów, zanim import się zatrzymał. Wybierz plik ponownie, aby powtórzyć resztę — kontakty, które już istnieją, zostaną pominięte jako duplikaty.",
         "empty": "W pliku nie znaleziono żadnych kontaktów.",
         "capped": "Zaimportowanych zostanie tylko pierwszych {{max}} kontaktów."
       },
@@ -1068,9 +1070,13 @@
     "answered": "Z odpowiedzią",
     "select": "Zaznacz wiadomość",
     "selectAll": "Zaznacz wszystkie",
-    "selected": "Zaznaczono: {{count}}",
-    "selectedOfTotal": "Zaznaczono: {{count}} z {{total}}",
+    "selected": "Zaznaczono: {{count, number}}",
+    "selectedOfTotal": "Zaznaczono: {{count, number}} z {{total, number}}",
     "clearSelection": "Wyczyść zaznaczenie",
+    "selectAllInQuery": "Zaznacz wszystkie {{total, number}}",
+    "selectAllOffline": "Jesteś offline. Cały folder można zaznaczyć tylko przy aktywnym połączeniu.",
+    "selectAllTooMany": "Ponad {{max, number}} wiadomości — zbyt wiele, aby zaznaczyć je w jednym kroku.",
+    "selectAllFailed": "Nie udało się teraz odczytać folderu — zaznaczenie pozostaje bez zmian.",
     "actions": {
       "archive": "Archiwizuj",
       "delete": "Usuń",
@@ -1109,9 +1115,9 @@
     },
     "viewOptionsUnavailable": "Sortowanie i widok wątków działają tylko w folderach.",
     "confirmDeleteBody_one": "Ta wiadomość zostanie trwale usunięta. Tej operacji nie można cofnąć.",
-    "confirmDeleteBody_few": "Te {{count}} wiadomości zostaną trwale usunięte. Tej operacji nie można cofnąć.",
-    "confirmDeleteBody_many": "Tych {{count}} wiadomości zostanie trwale usuniętych. Tej operacji nie można cofnąć.",
-    "confirmDeleteBody_other": "{{count}} wiadomości zostanie trwale usuniętych. Tej operacji nie można cofnąć.",
+    "confirmDeleteBody_few": "Te {{count, number}} wiadomości zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+    "confirmDeleteBody_many": "Tych {{count, number}} wiadomości zostanie trwale usuniętych. Tej operacji nie można cofnąć.",
+    "confirmDeleteBody_other": "{{count, number}} wiadomości zostanie trwale usuniętych. Tej operacji nie można cofnąć.",
     "loadMore": "Wczytaj więcej",
     "loading": "Wczytywanie wiadomości",
     "stale": "Ta lista jest nieaktualna i odświeży się przy następnej synchronizacji.",
@@ -1484,10 +1490,10 @@
     "findLarge": "Znajdź duże wiadomości",
     "results": {
       "empty": "Żadna wiadomość nie pasuje do wyszukiwania. Spróbuj we wszystkich folderach albo użyj mniej słów.",
-      "count_one": "{{count}} wynik",
-      "count_few": "{{count}} wyniki",
-      "count_many": "{{count}} wyników",
-      "count_other": "{{count}} wyniku"
+      "count_one": "{{count, number}} wynik",
+      "count_few": "{{count, number}} wyniki",
+      "count_many": "{{count, number}} wyników",
+      "count_other": "{{count, number}} wyniku"
     },
     "chipsLabel": "Aktywne filtry",
     "chipsCount_one": "{{count}} aktywny filtr",

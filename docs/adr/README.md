@@ -64,7 +64,15 @@ Format: lightweight [MADR](https://adr.github.io/madr/), one page maximum.
 | [035](035-one-mailbox-subscription-for-the-whole-app.md) | One mailbox subscription for the whole app | accepted |
 | [036](036-machine-translation-with-a-mechanical-gate.md) | Twelve machine-translated languages, behind a gate that removes the failures a reviewer cannot see | accepted |
 | [037](037-the-account-switcher-ships-without-store-isolation.md) | The account switcher ships without the per-account store, and says so | accepted |
-| [038](038-creates-are-not-idempotent-and-jmap-offers-no-key.md) | Creates are not idempotent, JMAP offers no key, and the outbox re-sends them anyway | proposed |
+| [038](038-creates-are-not-idempotent-and-jmap-offers-no-key.md) | Creates are not idempotent, JMAP offers no key, and the outbox re-sends them anyway | accepted |
+| [039](039-a-send-finishes-its-leftovers-it-never-fails-for-them.md) | A send finishes its own leftovers (a refused draft destroy, a refused source flag); it never fails for them | accepted |
+| [040](040-the-ime-rule-lives-in-ui.md) | The IME rule lives in `ui/`, because `ui/` is the only directory that depends on nothing | accepted |
+| [041](041-the-session-document-lives-with-the-credentials.md) | The JMAP session document is persisted, and it lives with the credentials rather than in the replica | accepted |
+| [042](042-select-all-pins-the-ids-it-found.md) | "Select all 300" pins the 300 ids it found; it does not follow the query | accepted |
+| [043](043-a-selection-has-an-upper-bound.md) | A selection has an upper bound, and past it the app says so instead of trying | accepted |
+| [044](044-numbers-are-formatted-by-the-interpolator.md) | A number in a sentence is formatted by the interpolator, not by the caller | accepted |
+| [045](045-a-tab-walk-has-to-be-anchored.md) | A Tab walk has to be anchored, because `document.body.focus()` moves nothing | accepted |
+| [046](046-a-shared-account-syncs-what-it-serves-not-what-it-advertises.md) | A shared account syncs what it serves, not what it advertises | accepted |
 
 Regenerate this table after adding an ADR — it is written by hand, and a missing row is the
 kind of omission nobody notices.
