@@ -269,7 +269,7 @@ threat in this document, because a modified Waxwing sees everything the real one
 
   ```sh
   gh attestation verify waxwing-stalwart.zip --repo Heiko-W/waxwing \
-    --source-ref refs/tags/v0.24.0
+    --source-ref refs/tags/v0.24.1
   ```
 
   This is the one control here that a checksum is not, because the signature is made by the
@@ -280,7 +280,7 @@ threat in this document, because a modified Waxwing sees everything the real one
   workflow can be dispatched against a branch, and does that deliberately as a rehearsal — so
   attestations exist that name `refs/heads/main`. Without `--source-ref` the check accepts them:
   measured, exit 0 on a rehearsal artefact, and exit 1 with
-  `expected SourceRepositoryRef to be refs/tags/v0.24.0, got refs/heads/main` once the flag is
+  `expected SourceRepositoryRef to be refs/tags/v0.24.1, got refs/heads/main` once the flag is
   given. Whoever can push a branch here can therefore produce a zip that passes the unqualified
   command — and "whoever can push a branch" is a strictly weaker position than the release
   rights this control exists to constrain. **It starts with v0.10.0**: the
@@ -313,7 +313,7 @@ threat in this document, because a modified Waxwing sees everything the real one
   at your site looking at it — including a release published by whoever compromises this
   project next. That is a real convenience and a real transfer of trust, and the trade is
   yours to make rather than ours. **If it is not a trade you want: pin
-  `resourceUrl` to a versioned asset** (`…/download/waxwing-stalwart-v0.24.0.zip`), drop
+  `resourceUrl` to a versioned asset** (`…/download/waxwing-stalwart-v0.24.1.zip`), drop
   `autoUpdateFrequency`, and upgrade deliberately — verifying the checksum and the
   attestation each time.
   [`docs/deployment.md`](docs/deployment.md#verifying-what-you-installed) spells out both
@@ -362,15 +362,18 @@ is one named package in a reviewable file, not a blanket permission.
 packages in `pnpm-lock.yaml` is reported. Automated *fix PRs* are deliberately **off**, and
 `.github/dependabot.yml` still does not watch npm — that file's reasoning is about a bot opening
 lockfile PRs that get merged unread, which is an argument against unattended UPDATES, not against
-being told. Fixes are applied by hand; six currently sit as `overrides` in `pnpm-workspace.yaml`,
+being told. Fixes are applied by hand; eight currently sit as `overrides` in `pnpm-workspace.yaml`,
 each with the parent's declared range written next to it.
 
 **Limits.** Alerts are not a scan of what actually ships: they match the lockfile, so a
 build-time-only package counts the same as one in the bundle, and the triage of which is which is
-a person's job. One alert is open on purpose — esbuild `GHSA-g7r4-m6w7-qqqr`, a Windows-only path
-traversal in esbuild's own dev server, unreachable here (vite serves; CI is `ubuntu-latest`) and
-unfixable without breaking `tsup@8.5.1`'s declared `^0.27.0`. It stays visible rather than
-dismissed.
+a person's job. **As of 2026-09-06 there are none open.** The esbuild advisory
+(`GHSA-g7r4-m6w7-qqqr`) that this section used to record as a deliberate exception is closed: the
+override to 0.28.1 leaves `tsup@8.5.1`'s declared `^0.27.0`, which is why it was refused before, but
+vite — the toolchain that builds the shipped bundle — accepts `^0.27.0 || ^0.28.0` and develops
+against 0.28. `pnpm build:libs` on 0.28.2 emits byte-identical output and the full gate passes, so
+the semver contract it steps outside of is one nothing in this repository depends on. Nothing has
+been dismissed.
 
 ---
 
