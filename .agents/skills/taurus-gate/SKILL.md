@@ -39,8 +39,8 @@ either a real defect or a test defect — see CONTRIBUTING before deciding which
 ## Definition of Done recap
 
 Full law: `CLAUDE.md` (Rules) + `docs/implementation-plan.md` §2.4 (DoD) and §2.5
-(conventions). **This repo has no `.codewhale/instructions.md` — upstream's CLAUDE.md
-governs.** Key points:
+(conventions). **The project law is upstream's `CLAUDE.md` +
+`docs/implementation-plan.md`.** Key points:
 
 - TypeScript strict: `tsconfig.base.json` sets `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes` — no `any`, no non-null assertion to slip past a type error.

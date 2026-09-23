@@ -63,13 +63,13 @@ first, or they silently become part of the feature branch's next commit.
 ## The local pre-push barrier (installed 2026-09-04)
 
 This clone has a local-only pre-push hook at `.git/hooks/pre-push` (NOT versioned — it
-cannot ride into any branch or PR; a copy lives at `~/.codewhale/hooks/pre-push-waxwing`
+cannot ride into any branch or PR; a copy lives at `~/.config/opencode/hooks/pre-push-waxwing`
 for reinstalling after a fresh clone). It refuses, with an actionable message:
 
 - any push to upstream (Heiko-W/waxwing);
 - deleting `refs/heads/main` (the skills' designated home);
 - pushing any branch other than `main` whose `upstream/main...<branch>` diff touches
-  `.agents/` or `.codewhale/` — i.e. the exact diff an upstream PR would show.
+  `.agents/`, `.opencode/` or `AGENTS.md` — i.e. the exact diff an upstream PR would show.
 
 Pushing `main` is always allowed. Bypass is `git push --no-verify` (and means it).
 Caveat: if `core.hooksPath` is ever set (e.g. to `.githooks` for the gate), git stops
@@ -121,7 +121,7 @@ that contains upstream history is fine, one that contains the local-only commits
 
 ## Material that stays local, by design
 
-- `.agents/skills/` (this skill set), `.codewhale/` (agent runtime state) — upstream has
+- `.agents/skills/` (this skill set), `AGENTS.md` (owner-global agent rules) — upstream has
   neither; neither belongs in a PR.
 - `e2e/audit/out/`, `e2e/shots/out/`, `playwright-report/`, `test-results/` (gitignored
   capture output — evidence, not PR material).

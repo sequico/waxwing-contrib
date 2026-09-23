@@ -8,8 +8,8 @@ description: Carry a plan-driven implementation or defect fix on the Waxwing rep
 This repo was built by plan-driven work packages with an adversarial review at every
 milestone; a change that follows the pattern lands, one that skips it drifts. The full law
 is `CLAUDE.md` + `docs/implementation-plan.md` (session protocol §2, DoD §2.4, conventions
-§2.5); this skill is the how-to. **There is no `.codewhale/instructions.md` in this repo —
-upstream's CLAUDE.md governs.**
+§2.5); this skill is the how-to. **The project law is upstream's `CLAUDE.md` +
+`docs/implementation-plan.md`; owner-global agent rules live in `AGENTS.md`.**
 
 ## 0. Before writing anything
 
@@ -36,8 +36,8 @@ upstream's CLAUDE.md governs.**
 ## 2. Implement — guarded
 
 - For anything beyond a one-file fix, work in a separate **git worktree or branch**; never
-  run parallel writers in the main checkout. In Codewhale: `agent(action=start, type=builder,
-  worktree=true)` with bounded `write_roots` covering only the areas you own. Work destined
+  run parallel writers in the main checkout. In OpenCode: dispatch a builder subagent (the
+  `subagent` tool) with a bounded prompt and work in a separate worktree. Work destined
   for upstream is cut from `upstream/main`, not from this fork's main — see skill
   **taurus-upstream**.
 - For genuinely divergent approaches, run candidates in parallel (2–4, one rubric) and pick

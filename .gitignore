@@ -64,7 +64,3 @@ Thumbs.db
 e2e/.pwa/
 dist-release/
 
-# Codewhale agent runtime state (local-only, never committed nor linted).
-# codewhale runtime state -- the rule mirror is committed, the rest is scratch
-.codewhale/*
-!.codewhale/instructions.md
